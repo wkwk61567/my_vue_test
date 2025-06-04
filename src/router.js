@@ -3,8 +3,10 @@ import OrdersTable from "@/views/OrdersTable.vue"; // 訂單管理頁面
 import CldhdMaster from "@/views/CldhdMaster.vue"; // 訂購單單據頁面
 import CldhdDetails from "@/views/CldhdDetails.vue"; // 訂購單明細頁面
 import CljhdMaster from "@/views/CljhdMaster.vue"; // 收貨單單據頁面
-import DatabaseQuery_ from "@/views/DatabaseQuery_.vue"; // 資料庫查詢頁面_測試
 import CljhdDetails from "@/views/CljhdDetails.vue"; // 收貨單明細頁面
+import DatabaseQuery_ from "@/views/DatabaseQuery_.vue"; // 資料庫查詢頁面_測試
+import CllldMaster from "@/views/CllldMaster.vue"; // 發料單單據頁面
+import CllldDetails from "@/views/CllldDetails.vue"; // 發料單明細頁面
 import Login from "@/views/Login.vue"; // 登入頁面
 //Windows 檔案系統大小寫不敏感 如果只是改檔名大小寫 需要先改成別的檔名 例如 login.vue -> login_.vue -> Login.vue
 import axios from "axios";
@@ -61,8 +63,7 @@ const routes = [
       requiredFlag: "findflag",
       titleKey: "cljhd",
     },
-  }, // 資料庫查詢頁面
-  { path: "/query_", component: DatabaseQuery_ }, // 資料庫查詢頁面_測試
+  },
   {
     path: "/cljhdDetails/:danno",
     component: CljhdDetails,
@@ -73,7 +74,30 @@ const routes = [
       requiredFlag: "findflag",
       titleKey: "cljhd",
     },
-  }, //明細和修改
+  },
+  {
+    path: "/cllldMaster",
+    component: CllldMaster,
+    props: true,
+    meta: {
+      requiresAuth: true,
+      requiredFormno: "cllld",
+      requiredFlag: "findflag",
+      titleKey: "cllld",
+    },
+  },
+  {
+    path: "/cllldDetails/:danno",
+    component: CllldDetails,
+    props: true,
+    meta: {
+      requiresAuth: true,
+      requiredFormno: "cllld",
+      requiredFlag: "findflag",
+      titleKey: "cllld",
+    },
+  },
+  { path: "/query_", component: DatabaseQuery_ }, // 資料庫查詢頁面_測試
 ];
 
 // 為了根據字典取得標題

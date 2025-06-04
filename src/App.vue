@@ -32,6 +32,17 @@
 
         <v-menu offset-y>
           <template v-slot:activator="{ props }">
+            <v-btn v-bind="props" variant="outlined">{{ labels['menu.NA.material'].name }}</v-btn>
+          </template>
+          <v-list>
+            <v-list-item to="/cllldMaster">
+              <v-list-item-title>{{ labels['submenu.NA.cllld'].name }}</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+
+        <v-menu offset-y>
+          <template v-slot:activator="{ props }">
             <v-btn v-bind="props" variant="outlined">{{ labels['menu.NA.other'].name }}</v-btn>
           </template>
           <v-list>

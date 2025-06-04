@@ -12,10 +12,12 @@
         <v-text-field
           :model-value="clpriceQuery['supplyno']"
           :label="labels['filter.clprice.supplyno'].name"
+          readonly
         ></v-text-field>
         <v-text-field
           :model-value="clpriceQuery['spno']"
           :label="labels['filter.clprice.spno'].name"
+          readonly
         ></v-text-field>
 
         <!-- 顯示訂單列表 -->
@@ -33,7 +35,13 @@
                 :style="isHovering ? { backgroundColor: '#f5f5f5' } : {}"
               >
                 <template v-for="header in headers" :key="header.key">
-                  <td>{{ item[header.key] }}</td>
+                  <td v-if="labels[header.key].componentType === 'checkbox'">
+                    <v-checkbox
+                      :model-value="item[header.key] === 1"
+                      disabled
+                    ></v-checkbox>
+                  </td>
+                  <td v-else >{{ item[header.key] }}</td>
                 </template>
               </tr>
             </v-hover>

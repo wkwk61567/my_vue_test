@@ -15,7 +15,7 @@
     />
     <ButtonsSaveDiscard
       :save="save"
-      :isSaveDisabled="!isMstComplete || isOtherFieldDisabled"
+      :isSaveDisabled="!isFormComplete || isAnyFieldInvalid"
       :discard="() => setMode('view')"
       :isButtonsSaveDiscardVisible="mode !== 'view'"
     />
@@ -36,6 +36,23 @@
                   {{ field.name }}
                 </v-btn>
               </template>
+              <template v-else-if="field.componentType === 'icon-text-field'">
+                <v-text-field
+                  v-model="form[field.column]"
+                  :label="field.name"
+                  :readonly="
+                    isReadonly(
+                      field.inputType,
+                      field.isEditable,
+                      field.componentType
+                    )
+                  "
+                  :style="{ backgroundColor: INPUT_COLOR[field.inputType] }"
+                  :append-inner-icon="field.icon"
+                  @click:append-inner="field.onClick"
+                  :error="utils.isFormError(mode, field, form[field.column])"
+                />
+              </template>
               <template v-else>
                 <component
                   :is="field.componentType === 'checkbox'
@@ -54,12 +71,13 @@
                       : field.componentType === 'date'
                         ? { type: 'date' }
                         : {}"
+                  @change="formChange(field)"
+                  :error="utils.isFormError(mode, field, form[field.column])"
                 />
               </template>
             </v-col>
           </template>
         </v-row>
-
         <!-- ...的小視窗 -->
         <SupplyDialog
           :dialog="dialog"
@@ -87,7 +105,7 @@
           @update:orderQuery[spspec]="orderQuery.spspec = $event"
           :orderFiltered="orderFiltered"
           @handleInputOrderQuery="handleInputOrderQuery"
-          @selectOrder="selectOrder"
+          @selectOrder="(item) => selectOrder(item, form.ddate)"
         ></CallOrderDialog>
       </v-card-text>
     </v-card>
@@ -98,7 +116,7 @@
       items-per-page="-1" 顯示所有資料
       fixed-header 固定表頭
        -->
-    <v-card class="mt-4">
+    <v-card class="mt-4  table-scroll-card">
       <v-data-table
         :headers="displayHeaders"
         :items="results"
@@ -106,7 +124,7 @@
         hide-default-footer
         :items-per-page="-1"
         no-data-text="No data available"
-        style="max-height: 400px; overflow-y: auto"
+        style="min-width: 1200px; max-height: 400px; overflow-y: auto"
         fixed-header
         height="400px"
       >
@@ -150,15 +168,16 @@
                   <v-text-field
                     v-model="item[header.key]"
                     type="text"
-                    :readonly="!item.isEditCljhditmClicked"
+                    :readonly="!item.isEditCljhditmClicked || isFieldDisabled(item, header.key)"
                     @change="
                       utils.handleField(item, header.key);
                       utils.setCljhditmNumbers(item, limitPercentage);
                     "
-                    @blur="handleJhpcsJhkgBlur(item, header.key)"
-                    :ref="el => { jhpcsRefs[item['header.cljhditm.id']] = el }"
-                    :error="!isJhpcsJhkgValid(item)"
-                    :error-messages="!isJhpcsJhkgValid(item) ? '請輸入暫收數量與暫收重量, 且不可為0' : null"
+                    :error="!isFieldValid(item, header.key)"
+                    :error-messages="isFocusMechanismActive && !isFieldDisabled(item, header.key) ? '必填' : null"
+                    :ref="setFieldRef(`field_${item['NA.cldhditm.id']}_${header.key}`)"
+                    @focus="handleFocus(item, header.key, $event.target)"
+                    @blur="handleBlur(item, header.key, $event.target)"
                   ></v-text-field>
                 </td>
                 <td v-else-if="header.key === 'header.cljhditm.jhkg'"
@@ -166,13 +185,16 @@
                   <v-text-field
                     v-model="item['header.cljhditm.jhkg']"
                     type="text"
-                    :readonly="!item.isEditCljhditmClicked || !(item.spkindno === '3' && (item.clkind === '板料' || item.clkind === '鋁擠型'))"
+                    :readonly="!item.isEditCljhditmClicked || !(item.spkindno === '3' && (item.clkind === '板料' || item.clkind === '鋁擠型')) || isFieldDisabled(item, header.key)"
                     @change="
                       utils.handleField(item, 'header.cljhditm.jhkg');
                       utils.setCljhditmNumbers(item, limitPercentage);
                     "
-                    @blur="handleJhpcsJhkgBlur(item, 'header.cljhditm.jhkg')"
-                    :ref="el => { jhkgRefs[item['header.cljhditm.id']] = el }"
+                    :error="!isFieldValid(item, header.key)"
+                    :error-messages="isFocusMechanismActive && !isFieldDisabled(item, header.key) ? '必填' : null"
+                    :ref="setFieldRef(`field_${item['NA.cldhditm.id']}_${header.key}`)"
+                    @focus="handleFocus(item, header.key, $event.target)"
+                    @blur="handleBlur(item, header.key, $event.target)"
                   ></v-text-field>
                 </td>
                 <td v-else
@@ -213,7 +235,7 @@
             class="plus-button"
             color="primary"
             @click="() => openCallOrdersDialog(form.supplyno)"
-            :disabled="isOtherFieldDisabled || !isMstComplete"
+            :disabled="!isFormComplete || isAnyFieldInvalid"
           >+</v-btn>
         </div>
       </template>
@@ -235,7 +257,7 @@ import * as XLSX from "xlsx";
 import { useCheckButtonFlags } from "@/composables/useCheckButtonFlags.js";
 import { useI18nHeadersLabels } from "@/composables/useI18nHeadersLabels.js";
 import { useOrderDialog } from "@/composables/useOrderDialog.js";
-import { useJhpcsJhkgValidate } from "@/composables/useJhpcsJhkgValidate.js";
+import { useFieldValidate } from "@/composables/useFieldValidate.js";
 
 const props = defineProps({
   danno: String,
@@ -273,11 +295,11 @@ const spkindnoOptionsWithEmpty = computed(() => {
 const ckkindOptions = ref([]); // 倉庫類別選項
 const formSelectOptions = {
   ckkind: ckkindOptions,
-}; // form中的所有選項
+}; // form中的所有選單的選項
 
 const results = ref([]); // 查詢結果(表格的內容)
 const idLastInDB = ref("0"); // 最後一筆已儲存的row的 id 用來分隔原有的row和新增的row //
-const IdCurrent = ref(0); // 目前最新的一筆row的 id
+const idCurrent = ref(0); // 目前最新的一筆row的 id
 
 const reset = () => {
   // 重設所有欄位(原本會在initializeData中加載的變數)
@@ -296,16 +318,37 @@ const reset = () => {
   results.value = [];
   ckkindOptions.value = [];
   idLastInDB.value = "0"; // 重置最後一筆已儲存的row的 id
-  IdCurrent.value = 0; // 重置目前最新的一筆row的 id
+  idCurrent.value = 0; // 重置目前最新的一筆row的 id
 };
 
+// 用來驗證表格欄位是否已填寫
+const fieldsRequired = computed(() => {
+  const fieldsArray = [];
+  for (const key in labels.value) {
+    if (key.startsWith('header.') && labels.value[key].isAllowBlank !== true) {
+      fieldsArray.push(key);
+    }
+  }
+  return fieldsArray;
+}); // 表格中的必填欄位
+console.log("fieldsRequired:", fieldsRequired.value);
+const numberRequired = ["header.cljhditm.jhpcs", "header.cljhditm.jhkg"]; // 不可為0的欄位
+const fieldRefs = reactive({});
+const setFieldRef = (refName) => (el) => {
+  if (el) {
+    fieldRefs[refName] = el;
+  }
+};
 const {
-  jhpcsRefs,
-  jhkgRefs,
-  isJhpcsJhkgValid,
-  handleJhpcsJhkgBlur,
-  isOtherFieldDisabled,
-} = useJhpcsJhkgValidate(results); // 用來驗證 jhpcs/jhkg 欄位是否已填寫
+  isFieldValid,
+  isRowFieldsValid,
+  isAnyFieldInvalid,
+  handleFocus,
+  handleBlur,
+  isFieldDisabled,
+  focusNextInvalidField,
+  isFocusMechanismActive,
+} = useFieldValidate(results, fieldsRequired.value, numberRequired, fieldRefs);
 
 const {
   isCallOrderDialogVisible, // 調用訂單介面(CallOrderDialog)是否顯示
@@ -314,7 +357,7 @@ const {
   openCallOrdersDialog, // 打開調用訂單介面(CallOrderDialog)
   handleInputOrderQuery, // 處理調用訂單介面(CallOrderDialog)的查詢條件
   selectOrder, // 暫時儲存訂單到下方的表格
-} = useOrderDialog(results, IdCurrent, jhpcsRefs);
+} = useOrderDialog(results, idCurrent, focusNextInvalidField);
 
 const orderInDBNum = ref(0); // 原本的行數 用來判斷是不是只剩一個row 是的話會在刪除此row後刪除整張收貨單
 
@@ -332,8 +375,14 @@ const setMode = async (newMode) => {
       prefix: "D_PC",
       table: "cljhdmst",
     };
-    const data = await utils.fetchData("cljhdDetailsAddGetCljhdDanno.php", params); // php的名字應該改成 getDannoSerial.php
-    form.danno = data[0].NewDanno;
+    const dannoData = await utils.fetchData("getSerialNumber.php", params);
+    form.danno = dannoData[0].NewDanno;
+
+    // 取得製單
+    const userData = await utils.fetchData("checkAuthenticated.php");
+    console.log("用戶資料：", userData);
+    form.maker = userData.powername;
+
     mode.value = "add";
   } else if (newMode === "edit") {
     // 設定為修改模式
@@ -345,7 +394,7 @@ const setMode = async (newMode) => {
   } else {
     // 設定為查看模式
     form.danno = props.danno;
-    initializeData(); // 重新加載資料
+    await initializeData(); // 重新加載資料
     mode.value = "view";
   }
 }
@@ -396,7 +445,7 @@ const initializeData = async () => {
 
   idLastInDB.value = data["cljhditm"].at(-1)["header.cljhditm.id"]; // 取得DB最後一筆的 id
   console.log("最後一筆的 id：", idLastInDB.value);
-  IdCurrent.value = idLastInDB.value; // 設置目前的 id 為DB最後一筆的 id
+  idCurrent.value = idLastInDB.value; // 設置目前的 id 為DB最後一筆的 id
   
   form.ddate = data["cljhdmst"][0].ddate.date.split(" ")[0]; // 將日期格式化為 YYYY-MM-DD
   form.ttime = data["cljhdmst"][0].ttime;
@@ -505,7 +554,7 @@ const save = async () => {
   if (itemsToBeAdded.length > 0) {
     // 只保存新增的row
     
-    IdCurrent.value = idLastInDB.value; // 重頭計算id
+    idCurrent.value = idLastInDB.value; // 重頭計算id
     // 逐行新增
     for (let item of itemsToBeAdded) {
       const params = {
@@ -518,7 +567,7 @@ const save = async () => {
         danno: form.danno,
         dannobase: form.dannobase,
         demo: form.demo,
-        id: ++IdCurrent.value, // 使用並遞增計數器
+        id: ++idCurrent.value, // 使用並遞增計數器
         dhdno: item["header.cljhditm.dhdno"],
         dhdid: item["header.cljhditm.dhdid"],
         spno: item["header.cljhditm.spno"],
@@ -555,7 +604,7 @@ const editItem = async (item) => {
     if (item.isEditCljhditmClicked) {
       // 儲存更新
 
-      if (! isJhpcsJhkgValid(item)) {
+      if (!isRowFieldsValid(item)) {
         alert("請輸入暫收數量及暫收重量，且暫存數量不為0");
         return;
       }
@@ -740,18 +789,13 @@ console.log("isReadonly:", labels.value['label.cljhdmst.supplyno']);
 const formRows = computed(() => {
   const formRowsTemp = [
     [
-      // 供方編碼
-      labels.value['label.cljhdmst.supplyno'],
-      // 按鈕需要在這裡自己定義
-      // ...按鈕
+      // 特殊機制需要在這裡自己定義
+      // 供方編碼(componentType: icon-text-field)
       {
-        column: 'supplyBtn',
-        componentType: 'button',
-        isAllowBlank: true,
-        cols: '1',
+        ...labels.value['label.cljhdmst.supplyno'],
+        componentType: "icon-text-field",
+        icon: (mode.value === "add" && !isAnyFieldInvalid.value) ?"mdi-dots-horizontal-circle" : null,
         onClick: openDialog,
-        disabled: () => mode.value !== 'add' || isOtherFieldDisabled.value,
-        name: '...'
       },
       // 調用訂單按鈕
       {
@@ -760,7 +804,7 @@ const formRows = computed(() => {
         isAllowBlank: true,
         cols: '1',
         onClick: () => openCallOrdersDialog(form.supplyno),
-        disabled: () => mode.value === 'view' || isOtherFieldDisabled.value || !isMstComplete.value,
+        disabled: () => mode.value === 'view' || isAnyFieldInvalid.value || !isFormComplete.value,
         name: labels.value["button.NA.callOrder"].name
       },
       labels.value['label.cljhdmst.ckkind'],
@@ -774,7 +818,20 @@ const formRows = computed(() => {
 });
 console.log("formRows:", formRows.value);
 
-const isMstComplete = computed(() => {
+const formChange = (field) => {
+  // 當表單欄位變更時觸發
+  if (field.column === 'ddate') {
+    let today = "";
+    [today] = utils.getCurrentDateTime();
+    if (new Date(form[field.column] ) > new Date(today)) {
+      alert("日期錯誤, 不能開今天以後的單");
+      form[field.column] = today;
+      return;
+    }
+  }
+};
+
+const isFormComplete = computed(() => {
   // 以後其他頁面可能也會用到, 到時候應該可以移到utils裡面
   // 檢查mst的欄位是否有空值
   for (let row of formRows.value) {
@@ -802,8 +859,8 @@ onMounted(async () => {
   limitPercentage.value = limitPercentageData[0];
   console.log("限制百分比：", limitPercentage.value);
 
-
-  // 檢查 URL 參數，如果 mode === 'edit' ，自動切換到編輯模式
+  await setMode("view");
+  // 檢查 URL 參數，自動切換到對應的模式
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("mode") === "add") {
     await setMode("add");
@@ -817,9 +874,6 @@ onMounted(async () => {
     const urlCurrent = new URL(window.location);
     urlCurrent.searchParams.delete('mode');
     window.history.replaceState({}, '', urlCurrent);
-  } else {
-    console.log("模式:", mode.value);
-    await setMode("view");
   }
 });
 

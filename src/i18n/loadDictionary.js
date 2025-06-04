@@ -46,6 +46,7 @@ export async function loadDictionary() {
           isAllowBlank: dictionaryDataRow.isAllowBlank || null,
           componentType: dictionaryDataRow.componentType || null,
           cols: dictionaryDataRow.cols || null,
+          isSticky: dictionaryDataRow.isSticky || null,
         };
       });
     }

@@ -1,5 +1,5 @@
 // 用來驗證 jhpcs/jhkg 欄位是否已填寫
-// 之後可以改寫成更廣泛的驗證函數, 並不只限於 jhpcs/jhkg
+// 現在改寫成更廣泛的驗證函數useFieldValidate, 這個應該就用不到了
 
 import { reactive, computed, nextTick } from "vue";
 

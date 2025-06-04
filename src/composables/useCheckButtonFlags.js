@@ -10,24 +10,15 @@ export function useCheckButtonFlags(formno, audit) {
 
   async function checkButtonFlags() {
     // 檢查按鈕是否禁用
-    isAddDisabled.value = !(await utils.checkFlag("addflag", formno));
-    isEditDisabled.value = !(await utils.checkFlag("editflag", formno));
-    isDeleteOrderDisabled.value = !(await utils.checkFlag(
-      "deleteflag",
-      formno
-    ));
+    isAddDisabled.value = !utils.checkFlag("addflag", formno);
+    isEditDisabled.value = !utils.checkFlag("editflag", formno);
+    isDeleteOrderDisabled.value = !utils.checkFlag("deleteflag", formno);
     if (audit === null || audit === "") {
-      isToggleAuditDisabled.value = !(await utils.checkFlag(
-        "auditflag",
-        formno
-      ));
+      isToggleAuditDisabled.value = !utils.checkFlag("auditflag", formno);
     } else {
-      isToggleAuditDisabled.value = !(await utils.checkFlag(
-        "unauditflag",
-        formno
-      ));
+      isToggleAuditDisabled.value = !utils.checkFlag("unauditflag", formno);
     }
-    isExportExcelDisabled.value = !(await utils.checkFlag("excelflag", formno));
+    isExportExcelDisabled.value = !utils.checkFlag("excelflag", formno);
   }
 
   return {

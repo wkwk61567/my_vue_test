@@ -12,22 +12,27 @@
         <v-text-field
           :model-value="gclpriceQuery['supplyno']"
           :label="labels['filter.gclprice.supplyno'].name"
+          readonly
         ></v-text-field>
         <v-text-field
           :model-value="gclpriceQuery['matno']"
           :label="labels['filter.gclprice.matno'].name"
+          readonly
         ></v-text-field>
         <v-text-field
           :model-value="gclpriceQuery['hig']"
           :label="labels['filter.gclprice.hig'].name"
+          readonly
         ></v-text-field>
         <v-text-field
           :model-value="gclpriceQuery['spcd']"
           :label="labels['filter.gclprice.spcd'].name"
+          readonly
         ></v-text-field>
         <v-text-field
           :model-value="gclpriceQuery['spunit']"
           :label="labels['filter.gclprice.spunit'].name"
+          readonly
         ></v-text-field>
 
         <!-- 價格選擇元件 -->
@@ -72,7 +77,13 @@
                 :style="isHovering ? { backgroundColor: '#f5f5f5' } : {}"
               >
                 <template v-for="header in headers" :key="header.key">
-                  <td>{{ item[header.key] }}</td>
+                  <td v-if="labels[header.key].componentType === 'checkbox'">
+                    <v-checkbox
+                      :model-value="item[header.key] === 1"
+                      disabled
+                    ></v-checkbox>
+                  </td>
+                  <td v-else >{{ item[header.key] }}</td>
                 </template>
               </tr>
             </v-hover>

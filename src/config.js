@@ -16,6 +16,7 @@ export const INPUT_COLOR = {
   inputable: "#ffffff",
   optional: "#dddddd",
   fixed: "#aaaaaa",
+  unused: "#888888",
 };
 export const LANGUAGE_OPTIONS = [
   { title: "繁體中文", key: "zh-TW" },

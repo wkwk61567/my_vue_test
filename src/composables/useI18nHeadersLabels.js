@@ -18,6 +18,10 @@ export function useI18nHeadersLabels(selectedLanguage, fileName) {
               fullDictionary[fileName]?.[category]?.[table]?.[column]?.[
                 selectedLanguage.value || selectedLanguage
               ] || column,
+            order:
+              fullDictionary[fileName]?.[category]?.[table]?.[column]?.[
+                "order"
+              ] || 0,
             inputType:
               fullDictionary[fileName]?.[category]?.[table]?.[column]?.[
                 "inputType"
@@ -37,6 +41,10 @@ export function useI18nHeadersLabels(selectedLanguage, fileName) {
             cols:
               fullDictionary[fileName]?.[category]?.[table]?.[column]?.[
                 "cols"
+              ] || null,
+            isSticky:
+              fullDictionary[fileName]?.[category]?.[table]?.[column]?.[
+                "isSticky"
               ] || null,
           };
         }

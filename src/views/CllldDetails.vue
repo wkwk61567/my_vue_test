@@ -4,9 +4,9 @@
       :add="() => setMode('add')"
       :isAddDisabled="isAddDisabled"
       :edit="() => setMode('edit')"
-      :isEditDisabled="isEditDisabled"
+      :isEditDisabled="true"
       :deleteOrder="deleteOrder"
-      :isDeleteOrderDisabled="isDeleteOrderDisabled"
+      :isDeleteOrderDisabled="true"
       :toggleAudit="toggleAudit"
       :isToggleAuditDisabled="isToggleAuditDisabled"
       :exportExcel="exportExcel"
@@ -99,22 +99,18 @@
             </v-col>
           </template>
         </v-row>
-
-        <!-- 供方的小視窗 -->
-        <SupplyDialog
-          :dialog="dialog"
-          @update:dialog="dialog = $event"
-          :supplyQuery="supplyQuery"
-          @update:supplyQuery="supplyQuery = $event"
-          :tempSupplykind="tempSupplykind"
-          @update:tempSupplykind="tempSupplykind = $event"
-          :spkindnoOptionsWithEmpty="spkindnoOptionsWithEmpty"
-          :filteredSuppliers="filteredSuppliers"
-          @handleInputSupplyQueryAndTempSupplykind="
-            handleInputSupplyQueryAndTempSupplykind
-          "
-          @selectSupplier="selectSupplier"
-        ></SupplyDialog>
+        <!-- 工令單物控向導的小視窗 -->
+        <ScgcdDialog
+          :isScgcdDialogVisible="isScgcdDialogVisible"
+          @update:isScgcdDialogVisible="isScgcdDialogVisible = $event"
+          :scgcdQuery="scgcdQuery"
+          @update:scgcdQuery[gcdno]="scgcdQuery['gcdno'] = $event"
+          @update:scgcdQuery[spno]="scgcdQuery['spno'] = $event"
+          @update:scgcdQuery[status]="scgcdQuery['status'] = $event"
+          @update:scgcdQuery[flag]="scgcdQuery['flag'] = $event"
+          @update:scgcdQuery[spkindno]="scgcdQuery['spkindno'] = $event"
+          @selectScgcd="selectScgcd"
+        ></ScgcdDialog>
         <!-- 材料的小視窗 -->
         <SpDialog
           :isSpDialogVisible="isSpDialogVisible"
@@ -130,24 +126,6 @@
           "
           @selectSp="selectSp"
         ></SpDialog>
-        <!-- 輔料價格的小視窗 -->
-        <ClpriceDialog
-          :isClpriceDialogVisible="isClpriceDialogVisible"
-          @update:isClpriceDialogVisible="isClpriceDialogVisible = $event"
-          :clpriceQuery="clpriceQuery"
-          :clprice="clprice"
-          @selectClprice="selectClprice"
-        ></ClpriceDialog>
-        <!-- 原材料價格的小視窗 -->
-        <GclpriceDialog
-          :isGclpriceDialogVisible="isGclpriceDialogVisible"
-          @update:isGclpriceDialogVisible="isGclpriceDialogVisible = $event"
-          :gclpriceQuery="gclpriceQuery"
-          :gclprice="gclprice"
-          @selectGclprice="selectGclprice"
-          :priceType="priceType"
-          @update:priceType="priceType=$event"
-          ></GclpriceDialog>
       </v-card-text>
     </v-card>
 
@@ -165,16 +143,13 @@
         hide-default-footer
         :items-per-page="-1"
         no-data-text="No data available"
-        style="max-height: 400px; overflow-x: auto; overflow-y: auto;"
+        style="max-height: 400px; overflow-x: auto; overflow-y: auto"
         height="400px"
       >
         <!-- 自定義 header 插槽，強制渲染表頭 -->
         <template v-slot:headers>
           <tr>
-            <th v-for="header in displayHeaders" 
-            :key="header.key" 
-            :style="tableCellStyles[`${header.key}_th`]"
-            >
+            <th v-for="header in displayHeaders" :key="header.key">
               {{ header.title }}
             </th>
           </tr>
@@ -196,82 +171,127 @@
                 </td>
               </template>
               <!-- 使用迴圈動態生成表格的欄位 -->
-               <!-- 用v-if和v-else-if做特殊處理 -->
+              <!-- 用v-if和v-else-if做特殊處理 -->
               <template v-for="header in headers" :key="header.key">
                 <td
-                  v-if="header.key === 'header.cldhditm.spno'"
-                  :style="tableCellStyles[`${header.key}_td`]"
-                >
-                  <v-text-field
-                    v-model="item[header.key]"
-                    readonly
-                    :append-inner-icon="(mode !== 'view' && !(item['header.cldhditm.getpcs'] > 0)) ? 'mdi-dots-horizontal-circle' : null"
-                    @click:append-inner="openSpDialog(item)"
-                  ></v-text-field>
-                </td>
-                <td
-                  v-else-if="header.key === 'header.cldhditm.pcs'"
+                  v-if="header.key === 'header.clllditm.gcdno'"
                   :style="{
                     backgroundColor: INPUT_COLOR[labels[header.key].inputType],
                   }"
                 >
                   <v-text-field
                     v-model="item[header.key]"
-                    :readonly="mode === 'view' || isFieldDisabled(item, header.key)"
-                    @change="utils.handleField(item, header.key); handlePcs(item); updateItm(item, header.key);"
-                    :error="!isFieldValid(item, header.key)"
-                    :error-messages="isFocusMechanismActive && !isFieldDisabled(item, header.key) ? '必填' : null"
-                    :ref="setFieldRef(`field_${item['NA.cldhditm.id']}_${header.key}`)"
-                    @focus="handleFocus(item, header.key, $event.target)"
-                    @blur="handleBlur(item, header.key, $event.target)"
-                  ></v-text-field>
-                </td>
-                <td
-                  v-else-if="header.key === 'header.cldhditm.price'"
-                  :style="tableCellStyles[`${header.key}_td`]"
-                >
-                  <v-text-field
-                    v-model="item[header.key]"
-                    :append-inner-icon="(mode !== 'view' && !isFieldDisabled(item, header.key) && spkindno === 3) ? 'mdi-dots-horizontal-circle' : null"
-                    @click:append-inner="openGclpriceDialog(item)"
                     readonly
-                    :error="!isFieldValid(item, header.key)"
-                    :error-messages="isFocusMechanismActive && !isFieldDisabled(item, header.key) ? '必填' : null"
-                    @change="updateItm(item, header.key)"
-                    :ref="setFieldRef(`field_${item['NA.cldhditm.id']}_${header.key}`)"
-                    @focus="handleFocus(item, header.key, $event.target)"
-                    @blur="handleBlur(item, header.key, $event.target)"
+                    :append-inner-icon="
+                      mode !== 'view' ? 'mdi-dots-horizontal-circle' : null
+                    "
+                    @click:append-inner="openScgcdDialog()"
                   ></v-text-field>
                 </td>
                 <td
-                  v-else-if="header.key === 'header.cldhditm.gdate'"
-                  :style="tableCellStyles[`${header.key}_td`]"
+                  v-else-if="header.key === 'header.clllditm.spno'"
+                  :style="{
+                    backgroundColor: INPUT_COLOR[labels[header.key].inputType],
+                  }"
                 >
                   <v-text-field
                     v-model="item[header.key]"
-                    type="date"
-                    :readonly="mode === 'view' || isFieldDisabled(item, header.key)"
-                    :error="!isFieldValid(item, header.key)"
-                    :error-messages="isFocusMechanismActive && !isFieldDisabled(item, header.key) ? '必填' : null"
-                    @change="gdateChange(item); updateItm(item, header.key);"
-                    :ref="setFieldRef(`field_${item['NA.cldhditm.id']}_${header.key}`)"
-                    @focus="handleFocus(item, header.key, $event.target)"
-                    @blur="handleBlur(item, header.key, $event.target)"
+                    readonly
+                    :append-inner-icon="
+                      mode !== 'view' ? 'mdi-dots-horizontal-circle' : null
+                    "
+                    @click:append-inner="
+                      openScgcdDialog(item['header.clllditm.gcdno'])
+                    "
                   ></v-text-field>
                 </td>
                 <td
-                  v-else-if="header.key === 'header.cldhditm.note'"
-                  :style="tableCellStyles[`${header.key}_td`]"
+                  v-else-if="header.key === 'header.clllditm.sqpcs'"
+                  :style="{
+                    backgroundColor: INPUT_COLOR[labels[header.key].inputType],
+                  }"
                 >
-                  <v-text-field 
+                  <v-text-field
                     v-model="item[header.key]"
-                    :readonly="mode === 'view' || isFieldDisabled(item, header.key)"
+                    :readonly="
+                      mode === 'view' || isFieldDisabled(item, header.key)
+                    "
+                    @change="
+                      utils.handleField(item, header.key);
+                      updateItm(item, header.key);
+                    "
+                  ></v-text-field>
+                </td>
+                <td
+                  v-else-if="header.key === 'header.clllditm.pcs'"
+                  :style="{
+                    backgroundColor: INPUT_COLOR[labels[header.key].inputType],
+                  }"
+                >
+                  <v-text-field
+                    v-model="item[header.key]"
+                    :readonly="
+                      mode === 'view' || isFieldDisabled(item, header.key)
+                    "
+                    @change="
+                      utils.handleField(item, header.key);
+                      updateItm(item, header.key);
+                    "
+                  ></v-text-field>
+                </td>
+                <td
+                  v-else-if="header.key === 'header.clllditm.pcsnx'"
+                  :style="{
+                    backgroundColor: INPUT_COLOR[labels[header.key].inputType],
+                  }"
+                >
+                  <v-text-field
+                    v-model="item[header.key]"
+                    :readonly="
+                      mode === 'view' || isFieldDisabled(item, header.key)
+                    "
+                    @change="
+                      utils.handleField(item, header.key);
+                      updateItm(item, header.key);
+                    "
+                  ></v-text-field>
+                </td>
+                <td
+                  v-else-if="header.key === 'header.clllditm.cbprice'"
+                  :style="{
+                    backgroundColor: INPUT_COLOR[labels[header.key].inputType],
+                  }"
+                >
+                  <v-text-field
+                    v-model="item[header.key]"
+                    :readonly="
+                      mode === 'view' || isFieldDisabled(item, header.key)
+                    "
+                    @change="
+                      utils.handleField(item, header.key);
+                      updateItm(item, header.key);
+                    "
+                  ></v-text-field>
+                </td>
+                <td
+                  v-else-if="header.key === 'header.clllditm.note'"
+                  :style="{
+                    backgroundColor: INPUT_COLOR[labels[header.key].inputType],
+                  }"
+                >
+                  <v-text-field
+                    v-model="item[header.key]"
+                    :readonly="
+                      mode === 'view' || isFieldDisabled(item, header.key)
+                    "
                     @change="updateItm(item, header.key)"
                   ></v-text-field>
                 </td>
                 <td
                   v-else
-                  :style="tableCellStyles[`${header.key}_td`]"
+                  :style="{
+                    backgroundColor: INPUT_COLOR[labels[header.key].inputType],
+                  }"
                 >
                   {{ item[header.key] }}
                 </td>
@@ -290,10 +310,7 @@
               >
                 {{ utils.calculateColumnSum(results, header.key) }}
               </td>
-              <td v-else :style="
-                  (tableCellStyles[`${header.key}_td`],
-                  { backgroundColor: INPUT_COLOR['fixed'] })
-                ">
+              <td v-else :style="{ backgroundColor: INPUT_COLOR['fixed'] }">
                 <!-- 不需要加總的欄位保持空白 -->
               </td>
             </template>
@@ -306,9 +323,10 @@
           <v-btn
             class="plus-button"
             color="primary"
-            @click="openSpDialog(null)"
+            @click="openScgcdDialog()"
             :disabled="!isFormComplete || isAnyFieldInvalid"
-          >+</v-btn>
+            >+</v-btn
+          >
         </div>
       </template>
     </v-card>
@@ -316,21 +334,26 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, inject, watch, nextTick } from "vue";
+import {
+  ref,
+  reactive,
+  computed,
+  onMounted,
+  inject,
+  watch,
+  nextTick,
+} from "vue";
 import { useRouter } from "vue-router";
 import { INPUT_COLOR } from "@/config.js";
 import * as utils from "@/utils/utils.js";
 import ButtonsCRUDP from "@/components/ButtonsCRUDP.vue";
 import ButtonsSaveDiscard from "@/components/ButtonsSaveDiscard.vue";
-import SupplyDialog from "@/components/SupplyDialog.vue";
+import ScgcdDialog from "@/components/ScgcdDialog.vue";
 import SpDialog from "@/components/SpDialog.vue";
-import ClpriceDialog from "@/components/ClpriceDialog.vue";
-import GclpriceDialog from "@/components/GclpriceDialog.vue";
 import * as XLSX from "xlsx";
 import { useCheckButtonFlags } from "@/composables/useCheckButtonFlags.js";
 import { useI18nHeadersLabels } from "@/composables/useI18nHeadersLabels.js";
 import { useFieldValidate } from "@/composables/useFieldValidate.js";
-import { useSupplyDialog } from "@/composables/useSupplyDialog.js";
 
 const props = defineProps({
   danno: String,
@@ -344,64 +367,66 @@ const { labels, headers } = useI18nHeadersLabels(selectedLanguage, fileName);
 
 // 上方的欄位
 const form = reactive({
-  supplyno: "", // 供方編碼
-  danno: props.danno, // 訂購單號, 從url接收
-  supplyname: "", // 供方名稱
-  ddate: "", // 訂購日期
+  danno: props.danno, // 領料單號, 從url接收
+  kind: "", // 類別
+  dannobase: "", // 原始單號
+  ddate: "", // 日期
   demo: "", // 備註
   maker: "", // 制單
   audit: "", // 審核
 });
 
-const spkindname = ref(""); // 在網頁版, spkindname與供方類別對應
-const spkindno = ref(""); // 類別編碼
-
-const spkindnoOptions = ref([]); // 收貨類別選項
-const spkindnoOptionsWithEmpty = computed(() => {
-  return [{ spkindno: "", spkindname: "" }, ...spkindnoOptions.value];
-}); // 在收貨類別選項中加入「不設限」選項
-
-const {
-  dialog,
-  supplyQuery,
-  tempSupplykind,
-  filteredSuppliers,
-  openDialog,
-  handleInputSupplyQueryAndTempSupplykind,
-} = useSupplyDialog(); // 選擇供方的視窗的狀態和方法
-
-const selectSupplier = async (supplier) => {
-  // 選取供方
-  form.supplyno = supplier["header.supply.supplyno"];
-  form.supplyname = supplier["header.supply.supplyname"];
-  spkindname.value = supplier["header.supply.supplykind"]; // 在網頁版, spkindname與供方類別對應
-  console.log("選取的供方：", spkindname.value);
-  if (spkindname.value === null || spkindname.value === "") {
-    spkindno.value = ""; // 沒有對應的類別編碼
-  } else {
-    spkindno.value =  spkindnoOptions.value.find(
-      (item) => item.spkindname === spkindname.value
-    ).spkindno; // 類別編碼
-  }
-
-  //  取得流水號(danno)
-  const params = {
-    prefix: `D_${form.supplyno}`,
-    table: "cldhdmst",
-  };
-  const data = await utils.fetchData(
-    "getSerialNumber.php",
-    params
-  );
-  form.danno = data[0].NewDanno;
-
-  dialog.value = false; // 關閉...視窗
-  openSpDialog(null); // 打開材料查詢介面
+const formSelectOptions = {
+  kind: ref(["生產領料", "生產制損", "外發領料", "包材領料"]), // 類別選項
 };
 
-let selecrRow = null; // 用來存儲選取的行
+// 工令單物控向導的小視窗的狀態和方法
+const isScgcdDialogVisible = ref(false); // 工令單物控向導的小視窗的顯示狀態
+const scgcdQuery = reactive({
+  gcdno: "",
+  spno: "",
+  status: "pending", // 預設查詢狀態為未完成
+  flag: "",
+  spkindno: "",
+}); // 工令單查詢條件
+// 調用發料單
+const openScgcdDialog = (gcdno = "") => {
+  // 打開工令單物控向導的小視窗(調用發料單)
+  scgcdQuery.gcdno = gcdno;
+  isScgcdDialogVisible.value = true;
+};
+const selectScgcd = (item) => {
+  // 選擇工令單
+  let tempItem = {};
+  tempItem["header.clllditm.id"] = ++idCurrent.value;
+  tempItem["header.clllditm.gcdno"] = item["header.scgcdmst.gcdno"];
+  tempItem["header.clllditm.spno"] = item["header.scgcditm.spno"];
+  tempItem["header.sp.splk"] = item["NA.sp.splk"];
+  tempItem["header.sp.spspec"] = item["header.sp.spspec"];
+  tempItem["header.sp.spunit"] = item["NA.sp.spunit"];
+  tempItem["header.clllditm.kcpcs"] = item["NA.sp.pcs"];
+  tempItem["header.clllditm.kcpcsnx"] = item["NA.sp.pcsnx"];
+  if (form.kind === "生產領料" || form.kind === "外發領料") {
+    // 外發領料目前沒有在使用了
+    tempItem["header.clllditm.yfpcs"] = item["header.NA.notpcs"];
+  } else if (form.kind === "生產制損") {
+    tempItem["header.clllditm.yfpcs"] = item["header.scgcditm.yfpcs"];
+  } else {
+    tempItem["header.clllditm.yfpcs"] = 0;
+  }
+  tempItem["header.clllditm.sqpcs"] = 0;
+  tempItem["header.clllditm.pcs"] = 0;
+  tempItem["header.clllditm.pcsnx"] = 0;
+  tempItem["header.clllditm.cbprice"] = 0;
+  tempItem["header.NA.pay"] = 0;
+  tempItem["header.clllditm.note"] = "";
+  console.log("選擇的工令單資料：", tempItem);
+  results.value.push(tempItem); // 新增一行
 
-// 材料的小視窗的狀態和方法
+  isScgcdDialogVisible.value = false; // 關閉工令單物控向導的小視窗
+};
+
+// 材料的小視窗的狀態和方法, 應該可以放到composables
 const isSpDialogVisible = ref(false); // 材料的小視窗的顯示狀態
 const spQuery = reactive({
   spno: "",
@@ -478,6 +503,8 @@ const handleInputSpQuery = () => {
 const selectSp = async (item) => {
   // 選取材料
   console.log("選取的材料：", item);
+  return; // 未完成
+  
   let tempItem = {};
   tempItem["header.cldhditm.spno"] = item["header.sp.spno"]; // 材料編碼
   tempItem["header.sp.spspec"] = item["header.sp.spspec"]; // 規格
@@ -523,127 +550,15 @@ const selectSp = async (item) => {
   focusNextInvalidField(tempItem); // 將焦點移到下一個未填寫的欄位
 };
 
-
-//  輔料價格的小視窗的狀態和方法
-const isClpriceDialogVisible = ref(false); // 輔料價格的小視窗的顯示狀態
-const clpriceQuery = reactive({
-  supplyno: "",
-  spno: "",
-}); // 輔料價格查詢條件
-const clprice = ref([]); // 輔料價格查詢結果
-
-const openClpriceDialog = async (item) => {
-  // 打開輔料價格查詢介面
-  // 網頁版只有原材料才可以選價格
-  selecrRow = item; // 儲存選取的行
-  if (!form.supplyno) {
-    console.error("供方編碼為空");
-  } else {
-    clpriceQuery.supplyno = form.supplyno; // 供方編碼
-    clpriceQuery.spno = item["header.cldhditm.spno"]; // 材料編碼
-    const params = {
-      supplyno: clpriceQuery.supplyno,
-      spno: clpriceQuery.spno,
-    };
-    clprice.value = await utils.fetchData("clprice.php", params);
-    clprice.value.forEach((item) => {
-      item["header.clprice.ddate"] = item["header.clprice.ddate"].date.split(" ")[0]; // 將日期格式化為 YYYY-MM-DD
-    });
-    console.log("輔料價格查詢結果：", clprice.value);
-  }
-  isClpriceDialogVisible.value = true; // 打開輔料價格查詢介面
-};
-
-const selectClprice = (item) => {
-  // 選取輔料價格
-  console.log("選取的輔料價格：", item);
-  selecrRow["header.cldhditm.price"] = item["header.clprice.price"]; // 單價
-  selecrRow["header.cldhditm.pay"] = parseFloat(
-    (selecrRow["header.cldhditm.pcs"] * selecrRow["header.cldhditm.price"]).toFixed(2)
-  ); // 計算金額
-  isClpriceDialogVisible.value = false; // 關閉輔料價格查詢視窗
-};
-
-
-// 原材料價格的小視窗的狀態和方法
-const isGclpriceDialogVisible = ref(false); // 原材料價格的小視窗的顯示狀態
-const gclpriceQuery = reactive({
-  supplyno: "",
-  matno: "",
-  hig: "",
-  spcd: "",
-  spunit: "",
-}); // 原材料價格查詢條件
-const gclprice = ref([]); // 原材料價格查詢結果
-const priceType = ref(""); // 價格類型
-
-const openGclpriceDialog = async (item) => {
-  // 打開原材料價格查詢介面
-  selecrRow = item; // 儲存選取的行
-  if (!form.supplyno) {
-    console.error("供方編碼為空");
-  } else {
-    gclpriceQuery.supplyno = form.supplyno; // 供方編碼
-    gclpriceQuery.spunit = item["header.cldhditm.spunit"]; // 單位
-    const params = {
-      supplyno: gclpriceQuery.supplyno,
-      spno: item["header.cldhditm.spno"], // 材料編碼
-    };
-    gclprice.value = await utils.fetchData("gclprice.php", params);
-    gclprice.value.forEach((item) => {
-      item["header.gclprice.ddate"] = item["header.gclprice.ddate"].date.split(" ")[0]; // 將日期格式化為 YYYY-MM-DD
-    });
-    console.log("原材料價格查詢結果：", gclprice.value);
-
-    gclpriceQuery.matno = gclprice.value[0]["header.gclprice.matno"]; // 在php中用spno查詢sp取得
-    gclpriceQuery.hig = gclprice.value[0]["header.gclprice.hig"]; // 在php中用spno查詢sp取得
-    gclpriceQuery.spcd = item["header.sp.spcd"];
-    gclpriceQuery.spunit = item["header.sp.spunit"];
-    console.log("gclpriceQuery:", gclpriceQuery);
-  }
-  priceType.value = ""; // 清空價格類型
-  isGclpriceDialogVisible.value = true; // 打開原材料價格查詢介面
-};
-const selectGclprice = (item) => {
-  // 選取原材料價格
-  console.log("選取的原材料價格：", item);
-
-  // 填入單價欄位
-  if (selecrRow.clkind === '卷料') {
-    const priceTypeName = "header.gclprice.pricekg" + priceType.value;
-    console.log("priceTypeName:", priceTypeName);
-    if (item[priceTypeName] > 0) {
-      selecrRow["header.cldhditm.price"] = item[priceTypeName]; 
-    } else {
-      alert("價格為0");
-      return;
-    }
-  } else {
-    const priceTypeName = "header.gclprice.price" + priceType.value;
-    console.log("priceTypeName:", priceTypeName);
-    if (item[priceTypeName] > 0) {
-      selecrRow["header.cldhditm.price"] = item[priceTypeName];
-    } else {
-      alert("價格為0");
-      return;
-    }
-  }
-  selecrRow["header.cldhditm.pay"] = parseFloat(
-    (selecrRow["header.cldhditm.kg"] * selecrRow["header.cldhditm.price"]).toFixed(2)
-  ); // 計算金額
-  isGclpriceDialogVisible.value = false; // 關閉原材料價格查詢視窗
-};
-
-
 const results = ref([]); // 查詢結果(表格的內容)
-const idLastInDB = ref("0"); // 最後一筆已儲存的row的 id 用來分隔原有的row和新增的row //
+const idLastInDB = ref("0"); // 最後一筆已儲存的row的 id 用來分隔原有的row和新增的row
 const idCurrent = ref(0); // 目前最新的一筆row的 id
 
 const reset = () => {
   // 重設所有欄位(原本會在initializeData中加載的變數)
-  form.supplyno = "";
   form.danno = "";
-  form.supplyname = "";
+  form.kind = "";
+  form.dannobase = "";
   form.ddate = "";
   form.demo = "";
   form.maker = "";
@@ -652,17 +567,15 @@ const reset = () => {
   idLastInDB.value = "0"; // 重置最後一筆已儲存的row的 id
   idCurrent.value = 0; // 重置目前最新的一筆row的 id
 
-  Object.keys(form).forEach(key => {
+  Object.keys(form).forEach((key) => {
     formPreviousValues[key] = form[key];
   }); // 紀錄form欄位的值
 
   resultsPreviousValues = {};
-  results.value.forEach(item => {
-    resultsPreviousValues[item["NA.cldhditm.id"]] = { ...item };
+  results.value.forEach((item) => {
+    resultsPreviousValues[item["NA.clllditm.id"]] = { ...item };
   }); // 紀錄results的值
 };
-
-const paynoOptions = ref([]); // 幣別選項
 
 const orderInDBNum = ref(0); // 原本的行數，用來判斷是不是只剩一個row，是的話會在刪除此row後刪除整張收貨單
 
@@ -674,6 +587,14 @@ const setMode = async (newMode) => {
     reset(); // 重設所有欄位
 
     [form.ddate] = utils.getCurrentDateTime(); // 取得當前日期
+
+    //  取得流水號(danno)
+    const params = {
+      prefix: `D_ML`,
+      table: "cllldmst",
+    };
+    const data = await utils.fetchData("getSerialNumber.php", params);
+    form.danno = data[0].NewDanno;
 
     // 取得製單
     const userData = await utils.fetchData("checkAuthenticated.php");
@@ -697,10 +618,11 @@ const setMode = async (newMode) => {
 };
 
 const columnsForSum = ref([
-  "header.cldhditm.pcs",
-  "header.cldhditm.kg",
-  "header.cldhditm.pay",
-  "header.cldhditm.getpcs",
+  "header.clllditm.yfpcs",
+  "header.clllditm.sqpcs",
+  "header.clllditm.pcs",
+  "header.clllditm.pcsnx",
+  "header.clllditm.pay",
 ]); // 需要加總的欄位名稱
 
 const displayHeaders = computed(() => {
@@ -717,13 +639,13 @@ const initializeData = async () => {
     danno: form.danno,
   };
 
-  const data = await utils.fetchData("cldhdDetails.php", params); //透過api獲取資料
+  const data = await utils.fetchData("cllldDetails.php", params); //透過api獲取資料
   console.log("查詢結果：", data);
   if (
-    !data["cldhdmst"] ||
-    data["cldhdmst"].length === 0 ||
-    !data["cldhditm"] ||
-    data["cldhditm"].length === 0
+    !data["cllldmst"] ||
+    data["cllldmst"].length === 0 ||
+    !data["clllditm"] ||
+    data["clllditm"].length === 0
   ) {
     // 如果沒有資料, 設定顯示空白訂單
 
@@ -738,50 +660,38 @@ const initializeData = async () => {
   }
 
   // 接收查詢結果
-  results.value = data["cldhditm"];
-
-  // 轉換時間格式
-  results.value.forEach((item) => {
-    item["header.cldhditm.gdate"] = item["header.cldhditm.gdate"]
-      ? item["header.cldhditm.gdate"].date.split(" ")[0]
-      : "";
-  });
+  results.value = data["clllditm"];
 
   // 排序
   results.value.sort((a, b) => {
-    const danidA = a["header.cldhditm.danid"] || "";
-    const danidB = b["header.cldhditm.danid"] || "";
-    return danidA.localeCompare(danidB, "zh-Hant", { numeric: true });
+    const idA = String(a["header.clllditm.id"] || "");
+    const idB = String(b["header.clllditm.id"] || "");
+    return idA.localeCompare(idB, "zh-Hant", { numeric: true });
   });
 
-  idLastInDB.value = data["cldhditm"].at(-1)["NA.cldhditm.id"]; // 取得DB最後一筆的 id
+  idLastInDB.value = data["clllditm"].at(-1)["NA.clllditm.id"]; // 取得DB最後一筆的 id
   console.log("最後一筆的 id：", idLastInDB.value);
   idCurrent.value = idLastInDB.value; // 設置目前的 id 為DB最後一筆的 id
 
-  form.supplyno = data["cldhdmst"][0].supplyno;
-  form.supplyname = data["cldhdmst"][0].supplyname;
-  //form.danno = data["cldhdmst"][0].danno; // danno 由 url 接收
-  form.ddate = data["cldhdmst"][0].ddate.date.split(" ")[0]; // 將日期格式化為 YYYY-MM-DD
-  form.demo = data["cldhdmst"][0].demo;
-  form.maker = data["cldhdmst"][0].maker;
-  form.audit = data["cldhdmst"][0].audit;
-
-  spkindname.value = data["cldhdmst"][0].supplykind; // 在網頁版, spkindname與供方類別對應
-  spkindno.value =  spkindnoOptions.value.find(
-      (item) => item.spkindname === spkindname.value
-    ).spkindno; // 類別編碼
+  //form.danno = data["cllldmst"][0].danno; // danno 由 url 接收
+  form.kind = data["cllldmst"][0].kind;
+  form.dannobase = data["cllldmst"][0].dannobase;
+  form.ddate = data["cllldmst"][0].ddate.date.split(" ")[0]; // 將日期格式化為 YYYY-MM-DD
+  form.demo = data["cllldmst"][0].demo;
+  form.maker = data["cllldmst"][0].maker;
+  form.audit = data["cllldmst"][0].audit;
 
   orderInDBNum.value = results.value.length; // 取得原本的行數
 
   console.log("results:", results.value);
 
-  Object.keys(form).forEach(key => {
+  Object.keys(form).forEach((key) => {
     formPreviousValues[key] = form[key];
   }); // 紀錄form欄位的值
 
   resultsPreviousValues = {};
-  results.value.forEach(item => {
-    resultsPreviousValues[item["NA.cldhditm.id"]] = { ...item };
+  results.value.forEach((item) => {
+    resultsPreviousValues[item["NA.clllditm.id"]] = { ...item };
   }); // 紀錄results的值
 
   await checkButtonFlags(); // 檢查按鈕狀態
@@ -789,6 +699,14 @@ const initializeData = async () => {
 
 const save = async () => {
   // 存檔到資料庫
+  if (
+    (parseFloat(results.value[0]["header.clllditm.pcs"]) ||
+      0 + parseFloat(results.value[0]["header.clllditm.pcsnx"]) ||
+      0) <= 0
+  ) {
+    alert("請填入實發數");
+    return;
+  }
 
   if (mode.value === "add") {
     // 檢查results是否為空
@@ -797,31 +715,39 @@ const save = async () => {
       return;
     }
     const itm = results.value.map((item) => ({
-      id: item["NA.cldhditm.id"],
-      spno: item["header.cldhditm.spno"],
-      pcs: item["header.cldhditm.pcs"],
-      payno: item["header.cldhditm.payno"],
-      price: item["header.cldhditm.price"],
-      gdate: item["header.cldhditm.gdate"],
-      note: item["header.cldhditm.note"],
+      id: item["header.clllditm.id"],
+      spno: item["header.clllditm.spno"],
+      pcs: item["header.clllditm.pcs"],
+      kcpcs: item["header.clllditm.kcpcs"],
+      gcdno: item["header.clllditm.gcdno"],
+      note: item["header.clllditm.note"],
+      cbprice: item["header.clllditm.cbprice"],
+      yfpcs: item["header.clllditm.yfpcs"],
+      sqpcs: item["header.clllditm.sqpcs"],
+      pcsnx: item["header.clllditm.pcsnx"],
+      kcpcsnx: item["header.clllditm.kcpcsnx"],
     }));
     const params = {
-      supplyno: form.supplyno,
+      dannobase: form.dannobase,
+      kind: form.kind,
       ddate: form.ddate,
       demo: form.demo,
       itm: itm,
     };
-    const data = await utils.fetchData("cldhdDetailsAdd.php", params); // 透過api新增資料
+    const data = await utils.fetchData("cllldDetailsAdd.php", params); // 透過api新增資料
     console.log("新增資料結果 (MST)：", data);
     alert("存檔完成");
 
     const url = {
-      path: `/cldhdDetails/${form.danno}`,
+      path: `/cllldDetails/${form.danno}`,
     };
     await router.push(url); // 移動到新增的訂單的頁面
   } else if (mode.value === "edit") {
+    return; // 未完成
     // 保存新增的row到資料庫
-    const itemsToBeAdded = results.value.filter(item => item["NA.cldhditm.id"] > idLastInDB.value); // 表格中新增的資料
+    const itemsToBeAdded = results.value.filter(
+      (item) => item["NA.cldhditm.id"] > idLastInDB.value
+    ); // 表格中新增的資料
     const itm = itemsToBeAdded.map((item) => ({
       id: item["NA.cldhditm.id"],
       spno: item["header.cldhditm.spno"],
@@ -842,42 +768,22 @@ const save = async () => {
   await setMode("view"); // 切換到查看模式
 };
 
-const handlePcs = async (item) => {
-  // 處理pcs欄位的變更
-  if (item["header.cldhditm.pcs"] < item["header.cldhditm.getpcs"]) {
-    alert("訂單數不能小於已入庫數!");
-    item["header.cldhditm.pcs"] = item["header.cldhditm.getpcs"];
-  }
-  console.log("pcs欄位更新:", item);
-  item["header.cldhditm.kg"] = parseFloat((item["header.cldhditm.pcs"] * item.dz).toFixed(4)); // 更新kg欄位
-  // 更新pay欄位
-  
-  if(spkindname.value === "原材料"){
-    item["header.cldhditm.pay"] = parseFloat(
-      (item["header.cldhditm.kg"] * item["header.cldhditm.price"]).toFixed(2)
-    );
-  } else {
-    item["header.cldhditm.pay"] = parseFloat(
-      (item["header.cldhditm.pcs"] * item["header.cldhditm.price"]).toFixed(2)
-    );
-  }
-};
-
 let formPreviousValues = {}; // 紀錄form欄位的先前值
 const updateMst = async (field) => {
   // 更新cldhdmst的欄位
 
-  // 檢查交貨日期是否早於訂購日期
-  for (const item of results.value) {
-    if (new Date(item["header.cldhditm.gdate"]) < new Date(form.ddate)) {
-      alert("交貨日期不能早於訂購日期");
-      form[field.column] = formPreviousValues[field.column]; // 恢復到先前的值
+  if (field.column === "ddate") {
+    let today = "";
+    [today] = utils.getCurrentDateTime();
+    if (new Date(form[field.column]) > new Date(today)) {
+      alert("日期錯誤, 不能開今天以後的單");
+      form[field.column] = today;
       return;
     }
   }
 
   if (mode.value === "edit") {
-    if (confirm(`您確定要更新${field.name}嗎?`)){
+    if (confirm(`您確定要更新${field.name}嗎?`)) {
       console.log("更新", field.column, "欄位");
       console.log("先前值:", formPreviousValues[field.column]);
       console.log("更改為:", form[field.column]);
@@ -897,24 +803,52 @@ const updateMst = async (field) => {
 };
 
 let resultsPreviousValues = {}; // 紀錄results欄位的先前值
-const updateItm= async (item, key) => {
-  // 更新cldhdItm的欄位
+const updateItm = async (item, key) => {
+  // 表格的欄位變動
 
-  // 新的欄位先跳過
-  if (item["NA.cldhditm.id"] > idLastInDB.value) {
-    console.log("需要按存檔按鈕");
-    return;
+  if (key === "header.clllditm.pcs" || key === "header.clllditm.pcsnx") {
+    // 處理實發數欄位的變更
+    if (form.kind == '生產領料' || form.kind == '外發領料') {
+      // 外發領料目前沒有在使用了
+      if (
+        parseFloat(item["header.clllditm.pcs"]) +
+          parseFloat(item["header.clllditm.pcsnx"]) >
+        parseFloat(item["header.clllditm.yfpcs"])
+      ) {
+        alert("實發數不能大於應發數");
+        item["header.clllditm.pcs"] = 0;
+        item["header.clllditm.pcsnx"] = 0;
+        return;
+      }
+    }
   }
 
-  // 檢察欄位是否有效
-  if (!isFieldValid(item, key)) {
-    return;
-  }
-
+  item["header.NA.pay"] =
+    parseFloat(
+      (
+        parseFloat(item["header.clllditm.pcs"]) *
+        parseFloat(item["header.clllditm.cbprice"])
+      ).toFixed(2)
+    ) || 0; // 更新金額
+  
   if (mode.value === "edit") {
+    // 更新資料庫
+
+    // 新的欄位先跳過
+    if (item["NA.clllditm.id"] > idLastInDB.value) {
+      console.log("需要按存檔按鈕");
+      return;
+    }
+
+    // 檢察欄位是否有效
+    if (!isFieldValid(item, key)) {
+      console.error(`欄位 ${key} 的值無效:`, item[key]);
+      return;
+    }
+
     console.log("先前值:", item[key]);
     console.log("先前值:", resultsPreviousValues[1]);
-    if (confirm(`您確定要更新${labels.value[key].name}嗎?`)){
+    if (confirm(`您確定要更新${labels.value[key].name}嗎?`)) {
       const params = {
         danno: form.danno,
         id: item["NA.cldhditm.id"],
@@ -938,7 +872,8 @@ const deleteRow = async (item) => {
       alert("此項已開始入倉, 不能刪行!");
       return;
     }
-    const confirmMessage = orderInDBNum.value === 1 ? "您確定要刪除整張單據嗎?" : "您確定要刪除?";
+    const confirmMessage =
+      orderInDBNum.value === 1 ? "您確定要刪除整張單據嗎?" : "您確定要刪除?";
     if (confirm(confirmMessage)) {
       const params = {
         danno: form.danno,
@@ -948,8 +883,7 @@ const deleteRow = async (item) => {
       console.log("刪除資料結果：", data);
       alert("刪除完成");
       const index = results.value.findIndex(
-        (result) =>
-          result["NA.cldhditm.id"] === item["NA.cldhditm.id"]
+        (result) => result["NA.cldhditm.id"] === item["NA.cldhditm.id"]
       );
       if (index !== -1) {
         results.value.splice(index, 1); // 從 results 中移除
@@ -960,11 +894,11 @@ const deleteRow = async (item) => {
       } else {
         console.error("Item not found in results:", item);
       }
-    } 
+    }
   } else {
     // 刪除調用訂單新增的row
     const index = results.value.findIndex(
-      (result) => result["NA.cldhditm.id"] === item["NA.cldhditm.id"]
+      (result) => result["header.clllditm.id"] === item["header.clllditm.id"]
     );
     if (index !== -1) {
       // 從 results 中移除該項
@@ -1011,8 +945,8 @@ const toggleAudit = async () => {
   const isAudit = form.audit === null || form.audit === "";
   const params = {
     danno: form.danno,
-    table: "cldhdmst",
-    formno: "cldhd",
+    table: "cllldmst",
+    formno: "cllld",
   };
 
   await utils.auditOrder(isAudit, params); // 切換資料庫中的審核狀態
@@ -1046,10 +980,10 @@ const exportExcel = () => {
 
   // 建立工作簿並附加工作表
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "收貨單明細");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "材料發料單明細");
 
   // 導出文件
-  XLSX.writeFile(workbook, "收貨單明細.xlsx");
+  XLSX.writeFile(workbook, "材料發料單明細.xlsx");
 };
 
 // 檢查按鈕是否禁用
@@ -1060,9 +994,8 @@ const {
   isToggleAuditDisabled,
   isExportExcelDisabled,
   checkButtonFlags,
-} = useCheckButtonFlags("cldhd", form.audit);
-
-
+} = useCheckButtonFlags("cllld", form.audit);
+/*
 // 實現凍結表頭和欄位的功能, 並動態計算最小寬度
 // 以後應該可以放到composables裡面?
 const stickyLeftMap = ref({}); // 用來存儲sticky的left值
@@ -1076,14 +1009,13 @@ async function calculateStickyLeft() {
   // 依照 displayHeaders 的順序計算
   for (const header of displayHeaders.value) {
     const key = header.key;
-    if (key === "header.cldhditm.gdate") {
-      thWidth = Math.max(10, String(header.title || '').length) * 8 + 35; // 避免日期未輸入時寬度太小
-    } else {
-      thWidth = Math.max(
-        ...results.value.map(row => String(row[key] || '').length),
-        String(header.title || '').length
-      ) * 8 + 35;
-    }
+    thWidth =
+      Math.max(
+        ...results.value.map((row) => String(row[key] || "").length),
+        String(header.title || "").length
+      ) *
+        8 +
+      35;
     minWidthMap.value[key] = thWidth;
     if (labels.value[key]?.isSticky) {
       stickyLeftMap.value[key] = left;
@@ -1091,77 +1023,68 @@ async function calculateStickyLeft() {
     }
   }
 }
-watch([displayHeaders, results], () => nextTick(calculateStickyLeft), { deep: true }); // 在每次表頭/資料變動後重新計算 sticky 的 left 值和最小寬度
+watch([displayHeaders, results], () => nextTick(calculateStickyLeft), {
+  deep: true,
+}); // 在每次表頭/資料變動後重新計算 sticky 的 left 值和最小寬度
 
 const tableCellStyles = computed(() => {
   // 儲存表格中的th和td的樣式
   const styles = {};
 
-  displayHeaders.value.forEach(header => {
+  displayHeaders.value.forEach((header) => {
     const key = header.key;
-    
+
     // 表頭樣式
     if (labels.value[key]?.isSticky) {
       styles[`${key}_th`] = {
-        position: 'sticky',
-        top: '0px',
-        backgroundColor: 'white',
+        position: "sticky",
+        top: "0px",
+        backgroundColor: "white",
         left: `${stickyLeftMap.value[key] || 0}px`,
         zIndex: 4,
-        minWidth: `${minWidthMap.value[key] || 0}px`
+        minWidth: `${minWidthMap.value[key] || 0}px`,
       };
     } else {
       styles[`${key}_th`] = {
-        position: 'sticky',
-        top: '0px',
-        backgroundColor: 'white',
+        position: "sticky",
+        top: "0px",
+        backgroundColor: "white",
         zIndex: 3,
-        minWidth: `${minWidthMap.value[key] || 0}px`
+        minWidth: `${minWidthMap.value[key] || 0}px`,
       };
     }
-    
+
     // 資料列樣式
     if (labels.value[key]?.isSticky) {
       styles[`${key}_td`] = {
-        position: 'sticky',
+        position: "sticky",
         left: `${stickyLeftMap.value[key] || 0}px`,
         background: INPUT_COLOR[labels.value[key]?.inputType],
         zIndex: 2,
-        minWidth: `${minWidthMap.value[key] || 0}px`
+        minWidth: `${minWidthMap.value[key] || 0}px`,
       };
     } else {
       styles[`${key}_td`] = {
         backgroundColor: INPUT_COLOR[labels.value[key]?.inputType],
-        minWidth: `${minWidthMap.value[key] || 0}px`
+        minWidth: `${minWidthMap.value[key] || 0}px`,
       };
     }
   });
-  
+
   return styles;
 });
-
-
+*/
 const formRows = computed(() => {
   const formRowsTemp = [
+    [labels.value["label.cllldmst.danno"], labels.value["label.cllldmst.kind"]],
     [
-      // 特殊機制需要在這裡自己定義
-      // 供方編碼(componentType: icon-text-field)
-      {
-        ...labels.value["label.cldhdmst.supplyno"],
-        componentType: "icon-text-field",
-        icon: (mode.value === "add" && form.supplyno === "") ?"mdi-dots-horizontal-circle" : null,
-        onClick: openDialog,
-      },
-      labels.value["label.cldhdmst.danno"],
+      labels.value["label.cllldmst.dannobase"],
+      labels.value["label.cllldmst.ddate"],
     ],
     [
-      labels.value["label.supply.supplyname"],
-      labels.value["label.cldhdmst.ddate"],
-    ],
-    [
-      labels.value["label.cldhdmst.demo"],
-      labels.value["label.cldhdmst.maker"],
-      labels.value["label.cldhdmst.audit"],
+      labels.value["label.cllldmst.demo"],
+      labels.value["label.cllldmst.maker"],
+      labels.value["label.cllldmst.audit"],
     ],
   ];
   return formRowsTemp;
@@ -1183,19 +1106,18 @@ const isFormComplete = computed(() => {
   return true; // 所有欄位都有值，返回true
 });
 
-
 // 用來驗證表格欄位是否已填寫
 const fieldsRequired = computed(() => {
   const fieldsArray = [];
   for (const key in labels.value) {
-    if (key.startsWith('header.') && labels.value[key].isAllowBlank !== true) {
+    if (key.startsWith("header.") && labels.value[key].isAllowBlank !== true) {
       fieldsArray.push(key);
     }
   }
   return fieldsArray;
 }); // 表格中的必填欄位
 console.log("fieldsRequired:", fieldsRequired.value);
-const numberRequired = ["header.cldhditm.pcs"]; // 不可為0的欄位
+const numberRequired = [""]; // 不可為0的欄位
 const fieldRefs = reactive({});
 const setFieldRef = (refName) => (el) => {
   if (el) {
@@ -1224,19 +1146,9 @@ const isReadonly = (inputType, isEditable, componentType) => {
   );
 };
 
-const gdateChange = (item) => {
-  if (new Date(item["header.cldhditm.gdate"]) < new Date(form.ddate)) {
-    item["header.cldhditm.gdate"] = "";
-    alert("交貨日期不能早於訂購日期");
-  }
-};
-
 // --- Lifecycle Hooks ---
 onMounted(async () => {
   // 原本的created, 應該可以拿出來直接執行?
-
-  spkindnoOptions.value = await utils.fetchCategories(); // 取得收貨類別選項
-  paynoOptions.value = await utils.fetchData("pay.php", {}); // 取得幣別選項
 
   await setMode("view");
 

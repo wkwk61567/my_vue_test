@@ -2,7 +2,7 @@
 import { API_BASE_URL } from "@/config";
 import axios from "axios";
 
-function sleep(ms) {
+export function sleep(ms) {
   // 測試用 可以用await sleep(1000) 來暫停1秒
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -266,8 +266,7 @@ export async function checkFlag(requiredFlag, requiredFormno) {
 
 export async function fetchData(apiFileName, params) {
   // 通用的API請求函數
-
-  console.log("傳送:", params);
+  console.log(`傳送至:${apiFileName}, 參數:`, params); 
   try {
     const response = await fetch(`${API_BASE_URL}/api/${apiFileName}`, {
       method: "POST",
@@ -301,4 +300,20 @@ export function getCurrentDateTime() {
   const minutes = String(now.getMinutes()).padStart(2, "0"); // 格式化為2位數
   const time = `${hours}:${minutes}`; // 設定時間
   return [date, time]; // 返回日期和時間
+}
+
+export function isFormError(mode, field, value) {
+  return (
+    mode !== "view" &&
+    !(
+      field.inputType === "fixed" ||
+      (field.inputType === "optional" &&
+        !(
+          field.componentType === "icon-text-field" ||
+          field.componentType === "select"
+        ))
+    ) &&
+    !field.isAllowBlank &&
+    (value === "" || value === null)
+  );
 }

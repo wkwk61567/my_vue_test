@@ -22,9 +22,9 @@
           <template v-for="field in row" :key="field.column">
             <v-col :cols="field.cols">
               <template v-if="field.componentType === 'button'">
+                <!-- 目前這個頁面沒有用到 -->
                 <v-btn
                   color="primary"
-                  dense
                   width="100%"
                   height="56px"
                   :disabled="field.disabled ? field.disabled() : false"
@@ -32,6 +32,14 @@
                 >
                   {{ field.name }}
                 </v-btn>
+              </template>
+              <template v-else-if="field.componentType === 'icon-text-field'">
+                <v-text-field
+                  v-model="form[field.column]"
+                  :label="field.name"
+                  :append-inner-icon="field.icon"
+                  @click:append-inner="field.onClick"
+                />
               </template>
               <template v-else>
                 <component
@@ -60,7 +68,7 @@
             </v-col>
           </template>
         </v-row>
-        <!-- ...的小視窗 -->
+        <!-- 供方的小視窗 -->
         <SupplyDialog
           :dialog="dialog"
           @update:dialog="dialog = $event"
@@ -79,14 +87,14 @@
     </v-card>
 
     <!-- 查詢結果顯示區塊：自定義 header 插槽 -->
-    <v-card class="mt-4">
+    <v-card class="mt-4 table-scroll-card">
       <v-card-title>查詢結果</v-card-title>
       <v-data-table
         :headers="headers"
         :items="results"
         no-data-text="No data available"
         :items-per-page="25"
-        style="max-height: 1200px; overflow-y: auto"
+        style="min-width: 1200px; max-height: 1200px; overflow-y: auto"
         fixed-header
         height="400px"
       >
@@ -135,6 +143,7 @@ import SupplyDialog from "@/components/SupplyDialog.vue";
 import * as XLSX from "xlsx";
 import { useI18nHeadersLabels } from "@/composables/useI18nHeadersLabels.js";
 import { useSupplyDialog } from "@/composables/useSupplyDialog.js";
+import { useCheckButtonFlags } from "@/composables/useCheckButtonFlags.js";
 
 const router = useRouter();
 const selectedLanguage = inject("selectedLanguage"); // 接收selectedLanguage 作為目前顯示的語言
@@ -152,8 +161,6 @@ const form = reactive({
   supplyno: "", // 供方編碼
   supplyname: "", // 供方名稱
 });
-
-const formSelectOptions = {}; // form中的所有選項
 
 const spkindnoOptions = ref([]); // 收貨類別選項
 const spkindnoOptionsWithEmpty = computed(() => {
@@ -188,16 +195,17 @@ const formRows = computed(() => {
       labels.value["filter.cldhdmst.demo"],
     ],
     [
-      labels.value["filter.cldhdmst.supplyno"],
-      labels.value["filter.supply.supplyname"],
-      // ...按鈕
+      // 供方編碼(componentType: icon-text-field)
       {
-        column: "supplyBtn",
-        componentType: "button",
-        isAllowBlank: true,
-        cols: "1",
+        ...labels.value["filter.cldhdmst.supplyno"],
+        icon: "mdi-dots-horizontal-circle",
         onClick: openDialog,
-        name: "...",
+      },
+      // 供方名稱(componentType: icon-text-field)
+      {
+        ...labels.value["filter.supply.supplyname"],
+        icon: "mdi-dots-horizontal-circle",
+        onClick: openDialog,
       },
     ],
   ];
@@ -205,15 +213,17 @@ const formRows = computed(() => {
 });
 console.log("formRows:", formRows.value);
 
-// 按鈕是否禁用
-const isAddDisabled = ref(true);
-const isEditDisabled = ref(true);
-const isDeleteOrderDisabled = ref(true);
-const isToggleAuditDisabled = ref(true);
-const isExportExcelDisabled = ref(true);
-const selectedRow = ref(null);
+// 檢查按鈕是否禁用
+const {
+  isAddDisabled,
+  isEditDisabled,
+  isDeleteOrderDisabled,
+  isToggleAuditDisabled,
+  isExportExcelDisabled,
+  checkButtonFlags,
+} = useCheckButtonFlags("cldhd", form.audit);
 
-const results = ref([]); // 查詢結果資料
+const results = ref([]); // 查詢結果
 
 const query = async () => {
   // 查詢cldhdmst
@@ -252,8 +262,31 @@ const query = async () => {
   });
 };
 
+// 選取row相關的變數和函式
+const selectedRow = ref(null); // 當前選取的row
+const selectRow = (item) => {
+  // 選取row
+  // 使用可選鏈運算子 (?.) 來處理 selectedRow 可能為 null 的情況
+  //selectedRow.value = item; // 設定選取的row
+
+  // 如果已選取的row與點擊的row相同 則取消選取 否則選取該row
+  selectedRow.value =
+    selectedRow.value?.["header.cldhdmst.danno"] ===
+    item["header.cldhdmst.danno"]
+      ? null
+      : item;
+};
+const isRowSelected = (dannoParam) => {
+  // 判斷row是否被選取
+  if (selectedRow.value === null) {
+    return false;
+  } else {
+    return selectedRow.value["header.cldhdmst.danno"] === dannoParam;
+  }
+};
+
 const add = () => {
-  // 開啟明細頁面 且直接切換至新增模式
+  // 開啟明細頁面，並直接切換至新增模式
 
   // 使用 window.open 開啟新分頁，添加新增模式參數
   const url = router.resolve({
@@ -272,28 +305,6 @@ const goToDetailsPage = (dannoParam) => {
     path: `/cldhdDetails/${dannoParam}`,
   }).href;
   window.open(url, "_blank");
-};
-
-const selectRow = (item) => {
-  // 選取row
-  // 使用可選鏈運算子 (?.) 來處理 selectedRow 可能為 null 的情況
-  //selectedRow.value = item; // 設定選取的row
-
-  // 如果已選取的row與點擊的row相同 則取消選取 否則選取該row
-  selectedRow.value =
-    selectedRow.value?.["header.cldhdmst.danno"] ===
-    item["header.cldhdmst.danno"]
-      ? null
-      : item;
-};
-
-const isRowSelected = (dannoParam) => {
-  // 判斷row是否被選取
-  if (selectedRow.value === null) {
-    return false;
-  } else {
-    return selectedRow.value["header.cldhdmst.danno"] === dannoParam;
-  }
 };
 
 const edit = () => {
@@ -321,7 +332,7 @@ const edit = () => {
 
 const deleteOrder = async () => {
   // 廢單
-  /*
+  
   if (selectedRow.value === null) {
     alert("請選擇一筆資料");
     return;
@@ -330,26 +341,30 @@ const deleteOrder = async () => {
     selectedRow.value["header.cldhdmst.audit"] === null ||
     selectedRow.value["header.cldhdmst.audit"] === ""
   ) {
-    if (confirm("您確定要刪除整張單據嗎?")) {
-      const params = {
-        danno: selectedRow.value["header.cldhdmst.danno"],
-      };
-      const data = await utils.fetchData("cldhdDetails.php", params); //透過api獲取該筆單據的資料
-      const resultsData = data["cldhditm"]; // 獲取明細資料
-      //console.log("明細資料:", resultsData);
-      for (let item of resultsData) {
-        await utils.cldhdDelete(
-          selectedRow.value["header.cldhdmst.danno"],
-          item["header.cldhditm.id"]
-        );
+     const itmData = await utils.fetchData("cldhdDetails.php", {danno: selectedRow.value["header.cldhdmst.danno"]}); //透過api獲取該筆單據的明細資料
+      console.log("明細資料:", itmData["cldhditm"]);
+    for (let item of itmData["cldhditm"]) {
+      if (item["header.cldhditm.getpcs"] > 0) {
+        alert("此單已有入庫, 不能廢單!");
+        return;
       }
+    }
+    if (confirm("您確定要刪除整張單據嗎?")) {
+      for (let item of itmData["cldhditm"]) {
+        const params = {
+          danno: selectedRow.value["header.cldhdmst.danno"],
+          id: item["NA.cldhditm.id"],
+        };
+        const data = await utils.fetchData("cldhdDelete.php", params); // 透過api刪除資料
+        console.log("刪除資料結果：", data);
+      }
+      alert("刪除完成");
     }
   } else {
     alert("此單已審核，不能刪除");
   }
   await query(); // 重新載入表格
   selectedRow.value = null; // 清除選擇
-  */
 };
 
 const toggleAudit = async () => {
@@ -398,23 +413,6 @@ const exportExcel = () => {
 
   // 導出文件
   XLSX.writeFile(workbook, "訂購單單據.xlsx");
-};
-
-const checkButtonFlags = async () => {
-  // 禁用沒有相關權限的按鈕
-  /*
-  isAddDisabled.value = !(await utils.checkFlag("addflag", "cldhd"));
-  isEditDisabled.value = !(await utils.checkFlag(
-    "editflag",
-    "cldhd"
-  ));
-  isDeleteOrderDisabled.value = !(await utils.checkFlag("deleteflag", "cldhd"));
-  */
-  isToggleAuditDisabled.value = !(
-    (await utils.checkFlag("auditflag", "cldhd")) ||
-    (await utils.checkFlag("unauditflag", "cldhd"))
-  );
-  isExportExcelDisabled.value = !(await utils.checkFlag("excelflag", "cldhd"));
 };
 
 onMounted(async () => {

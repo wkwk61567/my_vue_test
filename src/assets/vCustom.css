@@ -26,6 +26,9 @@
   height: auto !important;
 }
 
+.table-scroll-card {
+  overflow-x: auto; /* 允許水平滾動 */
+}
 
 .v-data-table {
   border-collapse: collapse;
@@ -41,10 +44,27 @@
   white-space: nowrap !important;   /* 不換行，讓欄寬跟內容走 */
   width: auto; 
 }
+
+
+:deep(.v-table td .v-field--appended) {
+  padding: 0px;
+}
+
 :deep(table input) {
   padding: 0px;
   width: auto;
 }
+
+:deep(.v-table td .v-field--variant-filled .v-field__outline::before, .v-field--variant-underlined .v-field__outline::before ) {
+  border-width: 0 0 3px; /* v-text-field的邊框寬度 */
+}
+
+/* 嘗試縮小日期輸入框中文字與日曆圖示之間的空白 */
+/* 針對 WebKit 瀏覽器 (Chrome, Safari, 新版 Edge) */
+:deep(.v-table td .v-field__input[type="date"]::-webkit-calendar-picker-indicator) {
+  margin-left: -15px !important; /* 使用負 margin 將圖示向左拉*/
+}
+
 /* 讓 v-text-field 在表格內自動寬度 */
 :deep(.v-table td .v-text-field) {
   width: auto;
@@ -82,3 +102,15 @@
 }
 
 
+/* 調試用 - 添加邊框來查看元素範圍 */
+.table-container {
+  border: 2px solid red !important;
+}
+
+.custom-data-table {
+  border: 2px solid blue !important;
+}
+
+:deep(.v-data-table__wrapper) {
+  border: 2px solid green !important;
+}

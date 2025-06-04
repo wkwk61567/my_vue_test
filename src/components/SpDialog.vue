@@ -48,10 +48,7 @@
         <v-text-field
           :model-value="spQuery['spkindname']"
           :label="labels['filter.sp.spkindname'].name"
-          @input="
-            $emit('update:spQuery[spkindname]', $event.target.value);
-            $emit('handleInputSpQuery');
-          "
+          readonly
         ></v-text-field>
 
         <!-- 顯示訂單列表 -->
@@ -81,7 +78,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted } from "vue";
+import { ref, computed, inject } from "vue";
 import * as utils from "@/utils/utils.js";
 import { useI18nHeadersLabels } from "@/composables/useI18nHeadersLabels.js";
 
@@ -89,25 +86,27 @@ import { useI18nHeadersLabels } from "@/composables/useI18nHeadersLabels.js";
 const selectedLanguage = inject("selectedLanguage");
 
 // 取得材料選項和單位選項
-let matnoOptions = [];
-let spunitOptions = [];
-onMounted(async () => {
+const matnoOptions = ref([]);
+const spunitOptions = ref([]);
+(async () => {
   const matData = await utils.fetchData("mat.php", {});
-  matnoOptions = matData.map((item) => ({
+  matnoOptions.value = matData.map((item) => ({
     matno: item.matno,
   }));
-  console.log("matnoOptions", matnoOptions);
+  console.log("matnoOptions", matnoOptions.value);
+})();
+(async () => {
   const spunitData = await utils.fetchData("spunit.php", {});
-  spunitOptions = spunitData.map((item) => ({
+  spunitOptions.value = spunitData.map((item) => ({
     spunit: item.spunit,
   }));
-  console.log("spunitOptions", spunitOptions);
-});
+  console.log("spunitOptions", spunitOptions.value);
+})();
 const matnoOptionsWithEmpty = computed(() => {
-  return [{ matno: "" }, ...matnoOptions];
+  return [{ matno: "" }, ...matnoOptions.value];
 }); // 在材料選項中加入「不設限」選項
 const spunitOptionsWithEmpty = computed(() => {
-  return [{ spunit: "" }, ...spunitOptions];
+  return [{ spunit: "" }, ...spunitOptions.value];
 }); // 在單位選項中加入「不設限」選項
 
 
@@ -133,7 +132,6 @@ const emit = defineEmits([
   "update:spQuery[spspec]",
   "update:spQuery[matno]",
   "update:spQuery[spunit]",
-  "update:spQuery[spkindname]",
   "handleInputSpQuery",
   "selectSp",
 ]);

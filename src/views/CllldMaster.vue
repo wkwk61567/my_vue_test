@@ -1,3 +1,4 @@
+<!-- 未完成 -->
 <template>
   <v-container style="max-width: none">
     <ButtonsCRUDP
@@ -68,21 +69,6 @@
             </v-col>
           </template>
         </v-row>
-        <!-- 供方的小視窗 -->
-        <SupplyDialog
-          :dialog="dialog"
-          @update:dialog="dialog = $event"
-          :supplyQuery="supplyQuery"
-          @update:supplyQuery="supplyQuery = $event"
-          :tempSupplykind="tempSupplykind"
-          @update:tempSupplykind="tempSupplykind = $event"
-          :spkindnoOptionsWithEmpty="spkindnoOptionsWithEmpty"
-          :filteredSuppliers="filteredSuppliers"
-          @handleInputSupplyQueryAndTempSupplykind="
-            handleInputSupplyQueryAndTempSupplykind
-          "
-          @selectSupplier="selectSupplier"
-        ></SupplyDialog>
       </v-card-text>
     </v-card>
 
@@ -94,7 +80,7 @@
         :items="results"
         no-data-text="No data available"
         :items-per-page="25"
-        style="min-width: 1200px;  max-height: 1200px; overflow-y: auto"
+        style="min-width: 1200px; max-height: 1200px; overflow-y: auto"
         fixed-header
         height="400px"
       >
@@ -114,9 +100,9 @@
             <tr
               v-bind="hoverProps"
               @click="selectRow(item)"
-              @dblclick="goToDetailsPage(item['header.cljhdmst.danno'])"
+              @dblclick="goToDetailsPage(item['header.cllldmst.danno'])"
               :style="
-                isRowSelected(item['header.cljhdmst.danno'])
+                isRowSelected(item['header.cllldmst.danno'])
                   ? { backgroundColor: '#d3d3d3' }
                   : isHovering
                   ? { backgroundColor: '#f5f5f5' }
@@ -139,11 +125,9 @@ import { ref, reactive, computed, onMounted, inject } from "vue";
 import { useRouter } from "vue-router";
 import * as utils from "@/utils/utils.js";
 import ButtonsCRUDP from "@/components/ButtonsCRUDP.vue";
-import SupplyDialog from "@/components/SupplyDialog.vue";
 import * as XLSX from "xlsx";
 import { useI18nHeadersLabels } from "@/composables/useI18nHeadersLabels.js";
 import { useCheckButtonFlags } from "@/composables/useCheckButtonFlags.js";
-import {useSupplyDialog} from "@/composables/useSupplyDialog.js";
 
 const router = useRouter();
 const selectedLanguage = inject("selectedLanguage"); // 接收selectedLanguage 作為目前顯示的語言
@@ -158,53 +142,36 @@ const form = reactive({
   dDateEnd: "", // 結束日期
   danno: "", // 收貨單號
   dannobase: "", // 原始單號
-  spkindname: null, // 收貨類別
+  kind: "", // 類型
+  maker: "", // 制單
 });
 
-const spkindnoOptions = ref([]); // 收貨類別選項
-const spkindnoOptionsWithEmpty = computed(() => {
-  return [{ spkindno: "", spkindname: null }, ...spkindnoOptions.value];
-}); // 在收貨類別選項中加入「不設限」選項
+const kindOptions = ref([
+  { kind: "" }, // 不設限選項
+  { kind: "生產領料" },
+  { kind: "生產制損" },
+  { kind: "外發領料" },
+  { kind: "包材領料" },
+]); // 類型選項
 const formSelectOptions = {
-  spkindname: spkindnoOptionsWithEmpty,
+  kind: kindOptions,
 }; // form中的所有選項
-
-const {
-  dialog,
-  supplyQuery,
-  tempSupplykind,
-  filteredSuppliers,
-  openDialog,
-  handleInputSupplyQueryAndTempSupplykind,
-} = useSupplyDialog(); // ...視窗的狀態和方法
-
-const selectSupplier = (supplier) => {
-  // 選取供方
-  form.supplyno = supplier["header.supply.supplyno"];
-  form.supplyname = supplier["header.supply.supplyname"];
-  dialog.value = false; // 關閉...視窗
-};
 
 // 上方的欄位
 const formRows = computed(() => {
   const formRowsTemp = [
-    [labels.value['filter.cljhdmst.dDateStart'], labels.value['filter.cljhdmst.dDateEnd']],
-    [labels.value['filter.cljhdmst.danno'], labels.value['filter.cljhdmst.dannobase']],
     [
-      // 供方編碼(componentType: icon-text-field)
-      {
-        ...labels.value["filter.cljhdmst.supplyno"],
-        icon: "mdi-dots-horizontal-circle",
-        onClick: openDialog,
-      },
-      // 供方名稱(componentType: icon-text-field)
-      {
-        ...labels.value["filter.supply.supplyname"],
-        icon: "mdi-dots-horizontal-circle",
-        onClick: openDialog,
-      },
+      labels.value["filter.cllldmst.dDateStart"],
+      labels.value["filter.cllldmst.dDateEnd"],
     ],
-    [labels.value['filter.cljhdmst.spkindname']]
+    [
+      labels.value["filter.cllldmst.danno"],
+      labels.value["filter.cllldmst.dannobase"],
+    ],
+    [
+      labels.value["filter.cllldmst.kind"],
+      labels.value["filter.cllldmst.maker"],
+    ],
   ];
   return formRowsTemp;
 });
@@ -218,19 +185,57 @@ const {
   isToggleAuditDisabled,
   isExportExcelDisabled,
   checkButtonFlags,
-} = useCheckButtonFlags("cldhd", form.audit);
+} = useCheckButtonFlags("cllld", form.audit);
+
+const results = ref([]); // 查詢結果
+
+const query = async () => {
+  // 查詢cllldmst
+  const params = {
+    dDateStart: form.dDateStart,
+    dDateEnd: form.dDateEnd,
+    danno: form.danno,
+    dannobase: form.dannobase,
+    kind: form.kind,
+    maker: form.maker,
+  };
+
+  console.log("查詢條件：", params);
+  results.value = await utils.fetchData("cllldMaster.php", params);
+  console.log("查詢結果：", results.value);
+
+  // 轉換時間格式
+  results.value.forEach((item) => {
+    item["header.cllldmst.ddate"] = item["header.cllldmst.ddate"]
+      ? item["header.cllldmst.ddate"].date.split(" ")[0]
+      : "";
+    item["header.cllldmst.dtime"] = item["header.cllldmst.dtime"]
+      ? item["header.cllldmst.dtime"].date.split(".")[0]
+      : "";
+    item["header.cllldmst.auditdtime"] = item["header.cllldmst.auditdtime"]
+      ? item["header.cllldmst.auditdtime"].date.split(".")[0]
+      : "";
+  });
+
+  // 根據 header.cllldmst.danno 排序
+  results.value.sort((a, b) => {
+    const dannoA = a["header.cllldmst.danno"] || "";
+    const dannoB = b["header.cllldmst.danno"] || "";
+    return dannoA.localeCompare(dannoB, "zh-Hant", { numeric: true });
+  });
+};
 
 // 選取row相關的變數和函式
-const selectedRow = ref(null);
+const selectedRow = ref(null); // 當前選取的row
 const selectRow = (item) => {
   // 選取row
   // 使用可選鏈運算子 (?.) 來處理 selectedRow 可能為 null 的情況
   //selectedRow.value = item; // 設定選取的row
-  
+
   // 如果已選取的row與點擊的row相同 則取消選取 否則選取該row
   selectedRow.value =
-    selectedRow.value?.["header.cljhdmst.danno"] ===
-    item["header.cljhdmst.danno"]
+    selectedRow.value?.["header.cllldmst.danno"] ===
+    item["header.cllldmst.danno"]
       ? null
       : item;
 };
@@ -239,83 +244,45 @@ const isRowSelected = (dannoParam) => {
   if (selectedRow.value === null) {
     return false;
   } else {
-    return selectedRow.value["header.cljhdmst.danno"] === dannoParam;
+    return selectedRow.value["header.cllldmst.danno"] === dannoParam;
   }
 };
 
-const results = ref([]); // 查詢結果
-
-const query = async () => {
-  // 查詢cljhdmst
-  const params = {
-    dDateStart: form.dDateStart,
-    dDateEnd: form.dDateEnd,
-    danno: form.danno,
-    dannobase: form.dannobase,
-    supplyno: form.supplyno,
-    spkindname: form.spkindname,
-  };
-
-  console.log("查詢條件：", params);
-  results.value = await utils.fetchData("cljhdMaster.php", params);
-  console.log("查詢結果：", results.value);
-
-  // 根據 header.cljhdmst.danno 排序
-  results.value.sort((a, b) => {
-    const dannoA = a["header.cljhdmst.danno"] || "";
-    const dannoB = b["header.cljhdmst.danno"] || "";
-    return dannoA.localeCompare(dannoB, "zh-Hant", { numeric: true });
-  });
-
-  // 轉換時間格式
-  results.value.forEach((item) => {
-    item["header.cljhdmst.ddate"] = item["header.cljhdmst.ddate"]
-      ? item["header.cljhdmst.ddate"].date.split(" ")[0]
-      : "";
-    item["header.cljhdmst.dtime"] = item["header.cljhdmst.dtime"]
-      ? item["header.cljhdmst.dtime"].date.split(".")[0]
-      : "";
-    item["header.cljhdmst.auditdtime"] = item["header.cljhdmst.auditdtime"]
-      ? item["header.cljhdmst.auditdtime"].date.split(".")[0]
-      : "";
-  });
-};
-
 const add = () => {
-  // 開啟明細頁面 且直接切換至新增模式
+  // 開啟明細頁面，並直接切換至新增模式
 
   // 使用 window.open 開啟新分頁，添加新增模式參數
   const url = router.resolve({
-    path: `/cljhdDetails/${selectedRow.value?.["header.cljhdmst.danno"]}`,
+    path: `/cllldDetails/${selectedRow.value?.["header.cllldmst.danno"]}`,
     query: { mode: "add" }, // 添加新增模式參數
   }).href;
   console.log("url:", url);
   window.open(url, "_blank");
-  
+
   //selectedRow.value = null; // 清除選擇
 };
 
 const goToDetailsPage = (dannoParam) => {
   // 使用 window.open 開啟新分頁
   const url = router.resolve({
-    path: `/cljhdDetails/${dannoParam}`,
+    path: `/cllldDetails/${dannoParam}`,
   }).href;
   window.open(url, "_blank");
 };
 
 const edit = () => {
-  // 開啟明細頁面 且直接切換至修改模式 
+  // 開啟明細頁面 且直接切換至修改模式
   if (selectedRow.value === null) {
     alert("請選擇一筆資料");
     return;
   }
   if (
-    selectedRow.value["header.cljhdmst.audit"] === null ||
-    selectedRow.value["header.cljhdmst.audit"] === ""
+    selectedRow.value["header.cllldmst.audit"] === null ||
+    selectedRow.value["header.cllldmst.audit"] === ""
   ) {
     // 使用 window.open 開啟新分頁，添加編輯模式參數
     const url = router.resolve({
-      path: `/cljhdDetails/${selectedRow.value["header.cljhdmst.danno"]}`,
+      path: `/cllldDetails/${selectedRow.value["header.cllldmst.danno"]}`,
       query: { mode: "edit" }, // 添加編輯模式參數
     }).href;
     console.log("url:", url);
@@ -328,27 +295,35 @@ const edit = () => {
 
 const deleteOrder = async () => {
   // 廢單
+
   if (selectedRow.value === null) {
     alert("請選擇一筆資料");
     return;
   }
   if (
-    selectedRow.value["header.cljhdmst.audit"] === null ||
-    selectedRow.value["header.cljhdmst.audit"] === ""
+    selectedRow.value["header.cllldmst.audit"] === null ||
+    selectedRow.value["header.cllldmst.audit"] === ""
   ) {
-    if (confirm("您確定要刪除整張單據嗎?")) {
-      const params = {
-        danno: selectedRow.value["header.cljhdmst.danno"],
-      };
-      const data = await utils.fetchData("cljhdDetails.php", params); //透過api獲取該筆單據的資料
-      const resultsData = data["cljhditm"]; // 獲取明細資料
-      //console.log("明細資料:", resultsData);
-      for (let item of resultsData) {
-        await utils.cljhdDelete(
-          selectedRow.value["header.cljhdmst.danno"],
-          item["header.cljhditm.id"]
-        );
+    const itmData = await utils.fetchData("cllldDetails.php", {
+      danno: selectedRow.value["header.cllldmst.danno"],
+    }); //透過api獲取該筆單據的明細資料
+    console.log("明細資料:", itmData["clllditm"]);
+    for (let item of itmData["clllditm"]) {
+      if (item["header.clllditm.getpcs"] > 0) {
+        alert("此單已有入庫, 不能廢單!");
+        return;
       }
+    }
+    if (confirm("您確定要刪除整張單據嗎?")) {
+      for (let item of itmData["clllditm"]) {
+        const params = {
+          danno: selectedRow.value["header.cllldmst.danno"],
+          id: item["NA.clllditm.id"],
+        };
+        const data = await utils.fetchData("cllldDelete.php", params); // 透過api刪除資料
+        console.log("刪除資料結果：", data);
+      }
+      alert("刪除完成");
     }
   } else {
     alert("此單已審核，不能刪除");
@@ -365,12 +340,12 @@ const toggleAudit = async () => {
   }
 
   const isAudit =
-    selectedRow.value["header.cljhdmst.audit"] === null ||
-    selectedRow.value["header.cljhdmst.audit"] === "";
+    selectedRow.value["header.cllldmst.audit"] === null ||
+    selectedRow.value["header.cllldmst.audit"] === "";
   const params = {
-    danno: selectedRow.value["header.cljhdmst.danno"],
-    table: "cljhdmst",
-    formno: "cljhd",
+    danno: selectedRow.value["header.cllldmst.danno"],
+    table: "cllldmst",
+    formno: "cllld",
   };
 
   await utils.auditOrder(isAudit, params);
@@ -399,19 +374,17 @@ const exportExcel = () => {
 
   // 建立工作簿並附加工作表
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "收貨單單據");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "材料發料單單據");
 
   // 導出文件
-  XLSX.writeFile(workbook, "收貨單單據.xlsx");
+  XLSX.writeFile(workbook, "材料發料單單據.xlsx");
 };
 
 onMounted(async () => {
-  spkindnoOptions.value = await utils.fetchCategories(); // 獲取收貨類別
   checkButtonFlags();
+  isEditDisabled.value = true; // 編輯按鈕臨時禁用
+  isDeleteOrderDisabled.value = true; // 刪除按鈕臨時禁用
 });
-
-
-
 </script>
 
 <style src="@/assets/vCustom.css" scoped></style>

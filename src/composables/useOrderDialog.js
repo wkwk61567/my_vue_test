@@ -1,7 +1,7 @@
 import { ref, reactive, nextTick } from "vue";
 import * as utils from "@/utils/utils.js";
 
-export function useOrderDialog(results, IdCurrent, jhpcsRefs) {
+export function useOrderDialog(results, idCurrent, focusNextInvalidField) {
   const isCallOrderDialogVisible = ref(false); // 調用訂單介面(CallOrderDialog)是否顯示
   const orderQuery = reactive({ danno: "", spno: "", spspec: "" }); // 用來存儲調用訂單介面(CallOrderDialog)的訂單查詢條件
   const orders = ref([]); // 用來存儲從API獲取的訂單資料 也就是調用訂單介面(CallOrderDialog)裡的訂單列表
@@ -88,15 +88,29 @@ export function useOrderDialog(results, IdCurrent, jhpcsRefs) {
     console.log("orderFiltered:", orderFiltered.value);
   }
 
-  async function selectOrder(order) {
+  async function selectOrder(order, ddate) {
     // 暫時儲存訂單到下方的表格
     // order是調用訂單中雙擊選中的item
-    IdCurrent.value += 1;
+
+    // 檢查交貨日期
+    if (!ddate) {
+      alert("收貨日期未設定");
+      return;
+    }
+    const gdate = new Date(order["header.cldhditm.gdate"]);
+    const earliestAllowedDate = new Date(gdate);
+    earliestAllowedDate.setDate(gdate.getDate() - 3);
+    if (new Date(ddate) < earliestAllowedDate) {
+      alert("交期未到, 只能提前3天交貨");
+      return;
+    }
+
+    idCurrent.value += 1;
 
     // 根據在調用訂單對話框選擇的未結訂單，將相關資訊帶入材料QC一覽表單據頁面下方表格，供輸入暫收數量和暫收重量
     let tempOrder = {};
     tempOrder["header.cljhdmst.supplyno"] = order["header.cldhdmst.supplyno"];
-    tempOrder["header.cljhditm.id"] = IdCurrent.value;
+    tempOrder["header.cljhditm.id"] = idCurrent.value;
     tempOrder["header.cljhditm.dhdno"] = order["header.cldhditm.danno"];
     tempOrder["header.cljhditm.dhdid"] = order["header.cldhditm.dhdid"];
     tempOrder["header.cljhditm.spno"] = order["header.cldhditm.spno"];
@@ -128,7 +142,7 @@ export function useOrderDialog(results, IdCurrent, jhpcsRefs) {
 
     // 等待DOM更新後，將焦點設置到新添加的行
     await nextTick();
-    jhpcsRefs[IdCurrent.value].focus();
+    focusNextInvalidField(tempOrder);
   }
 
   return {
